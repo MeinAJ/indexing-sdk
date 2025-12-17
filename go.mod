@@ -1,4 +1,4 @@
-module indexing-sdk
+module github.com/MeinAJ/indexing-sdk
 
 go 1.24.4
 
