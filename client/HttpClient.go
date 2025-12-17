@@ -63,6 +63,9 @@ type Event struct {
 	TransactionIndex uint      `json:"transactionIndex"`
 	LogIndex         uint      `json:"logIndex"`
 	ContractAddress  string    `json:"contractAddress"`
+	UserAddress      string    `json:"userAddress"`
+	TradeFee         uint64    `json:"tradeFee"`
+	TradeFeeCurrency string    `json:"tradeFeeCurrency"`
 	EventName        string    `json:"eventName"`
 	EventSignature   string    `json:"eventSignature"`
 	Topics           []string  `json:"topics"`
