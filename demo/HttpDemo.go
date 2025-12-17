@@ -7,7 +7,7 @@ import (
 	"log"
 )
 
-func Test() {
+func TestHttp() {
 	// 创建客户端
 	eventsClient := client.NewEventsClient(client.Config{
 		BaseURL: "http://127.0.0.1:8080",
