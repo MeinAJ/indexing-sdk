@@ -107,7 +107,7 @@ type Page struct {
 	LatestBlockNumber int64       `json:"latest_block_number"` // 最新区块号
 }
 
-// SubscribeEvents HTTP请求方法
+// SubscribeEvents 模拟订阅事件
 func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest) error {
 	timer := time.NewTimer(c.period)
 	innerReq := &HttpEventsRequest{
