@@ -1,6 +1,6 @@
 package main
 
-import "indexing-sdk/demo"
+import "github.com/MeinAJ/indexing-sdk/demo"
 
 func main() {
 	demo.TestHttp()

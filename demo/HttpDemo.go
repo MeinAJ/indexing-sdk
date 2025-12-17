@@ -3,11 +3,11 @@ package demo
 import (
 	"encoding/json"
 	"fmt"
-	"indexing-sdk/client"
+	"github.com/MeinAJ/indexing-sdk/client"
 	"log"
 )
 
-func TestHttp() {
+func Test() {
 	// 创建客户端
 	eventsClient := client.NewEventsClient(client.Config{
 		BaseURL: "http://127.0.0.1:8080",

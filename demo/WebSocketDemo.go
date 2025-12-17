@@ -3,7 +3,7 @@ package demo
 import (
 	"encoding/json"
 	"fmt"
-	"indexing-sdk/client"
+	"github.com/MeinAJ/indexing-sdk/client"
 )
 
 func TestWebsocket() {
