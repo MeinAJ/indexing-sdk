@@ -66,6 +66,7 @@ type Event struct {
 	UserAddress      string    `json:"userAddress"`
 	TradeFee         uint64    `json:"tradeFee"`
 	TradeFeeCurrency string    `json:"tradeFeeCurrency"`
+	EventUniqueHash  string    `json:"eventUniqueHash"`
 	EventName        string    `json:"eventName"`
 	EventSignature   string    `json:"eventSignature"`
 	Topics           []string  `json:"topics"`
