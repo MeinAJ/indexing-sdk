@@ -27,7 +27,7 @@ type Config struct {
 }
 
 // NewEventsClient 创建新的客户端实例
-func NewEventsClient(config *Config, dataChannel chan []*Event) *EventsClient {
+func NewEventsClient(config *Config) *EventsClient {
 	if config.Timeout == 0 {
 		config.Timeout = 5 * time.Second
 	}
@@ -42,9 +42,8 @@ func NewEventsClient(config *Config, dataChannel chan []*Event) *EventsClient {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
-		timeout:     config.Timeout,
-		debug:       config.Debug,
-		dataChannel: dataChannel,
+		timeout: config.Timeout,
+		debug:   config.Debug,
 	}
 }
 
@@ -69,6 +68,16 @@ func (request *HttpEventsRequest) Reset(fromBlock int, toBlock int, pageNumber i
 	request.ToBlock = toBlock
 	request.PageNumber = pageNumber
 	request.PageSize = pageSize
+}
+
+type MetaData struct {
+	ScanLatestBlockNumber    int  `json:"scanLatestBlockNumber"`    // 最后扫描区块号
+	ScanLatestBlockCompleted bool `json:"ScanLatestBlockCompleted"` // 最后扫描区块是否扫描完成
+}
+
+type EventData struct {
+	MetaData *MetaData `json:"metaData"`
+	Events   []*Event  `json:"events"`
 }
 
 // Event 事件数据结构
@@ -108,7 +117,7 @@ type Page struct {
 }
 
 // SubscribeEvents 模拟订阅事件
-func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest) error {
+func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData) error {
 	timer := time.NewTimer(c.period)
 	innerReq := &HttpEventsRequest{
 		FromBlock:  req.FromBlock,
@@ -127,17 +136,26 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest) error {
 				timer.Reset(c.period)
 				continue
 			}
-			// 将数据写入channel
-			c.dataChannel <- response.Data.Data.([]*Event)
+			metaData := &MetaData{
+				ScanLatestBlockNumber: req.FromBlock + 10,
+			}
+			eventData := &EventData{
+				Events:   response.Data.Data.([]*Event),
+				MetaData: metaData,
+			}
 			// 重置请求参数
 			if response.Data == nil || len(response.Data.Data.([]*Event)) < 100 {
 				// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
+				metaData.ScanLatestBlockCompleted = true
 				innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, 100)
-				timer.Reset(c.period)
 			} else {
 				// 2、区块范围还有数据时，页数+1
+				metaData.ScanLatestBlockCompleted = false
 				innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, 100)
 			}
+			// 发送数据
+			dataChannel <- eventData
+			timer.Reset(c.period)
 		}
 	}
 }
