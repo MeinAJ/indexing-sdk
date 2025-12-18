@@ -50,18 +50,18 @@ func NewEventsClient(config *Config, dataChannel chan []*Event) *EventsClient {
 
 // FlowEventsRequest HTTP请求参数
 type FlowEventsRequest struct {
-	FromBlock int    `json:"fromBlock"`
-	Address   string `json:"address,omitempty"`
-	EventName string `json:"eventName"`
+	FromBlock  int      `json:"fromBlock"`
+	Address    string   `json:"address,omitempty"`
+	EventNames []string `json:"eventNames,omitempty"`
 }
 
 type HttpEventsRequest struct {
-	FromBlock  int    `json:"fromBlock"`
-	ToBlock    int    `json:"toBlock"`
-	EventName  string `json:"eventName"`
-	Address    string `json:"address,omitempty"`
-	PageNumber int    `json:"pageNumber"`
-	PageSize   int    `json:"pageSize"`
+	FromBlock  int      `json:"fromBlock"`
+	ToBlock    int      `json:"toBlock"`
+	EventNames []string `json:"eventNames"`
+	Address    string   `json:"address,omitempty"`
+	PageNumber int      `json:"pageNumber"`
+	PageSize   int      `json:"pageSize"`
 }
 
 func (request *HttpEventsRequest) Reset(fromBlock int, toBlock int, pageNumber int, pageSize int) {
@@ -114,7 +114,7 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest) error {
 		FromBlock:  req.FromBlock,
 		ToBlock:    req.FromBlock + 10,
 		Address:    req.Address,
-		EventName:  req.EventName,
+		EventNames: req.EventNames,
 		PageNumber: 1,
 		PageSize:   100,
 	}
