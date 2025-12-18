@@ -109,11 +109,11 @@ type PageResponse struct {
 }
 
 type Page struct {
-	Page              int         `json:"page"`                // 页码
-	Size              int         `json:"size"`                // 每页大小
-	Total             int         `json:"total"`               // 总数
-	Data              interface{} `json:"data"`                // 数据
-	LatestBlockNumber int64       `json:"latest_block_number"` // 最新区块号
+	Page              int      `json:"page"`                // 页码
+	Size              int      `json:"size"`                // 每页大小
+	Total             int      `json:"total"`               // 总数
+	Data              []*Event `json:"data"`                // 数据
+	LatestBlockNumber int64    `json:"latest_block_number"` // 最新区块号
 }
 
 // SubscribeEvents 模拟订阅事件
@@ -140,11 +140,11 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 				ScanLatestBlockNumber: req.FromBlock + 10,
 			}
 			eventData := &EventData{
-				Events:   response.Data.Data.([]*Event),
+				Events:   response.Data.Data,
 				MetaData: metaData,
 			}
 			// 重置请求参数
-			if response.Data == nil || len(response.Data.Data.([]*Event)) < 100 {
+			if response.Data == nil || len(response.Data.Data) < 100 {
 				// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
 				metaData.ScanLatestBlockCompleted = true
 				innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, 100)
