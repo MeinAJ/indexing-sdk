@@ -9,8 +9,8 @@ import (
 func TestHttp() {
 
 	config := &client.Config{
-		BaseURL: "http://127.0.0.1:8080",
-		Timeout: time.Duration(10) * time.Second,
+		BaseURL:        "http://127.0.0.1:8080",
+		RequestTimeout: time.Duration(10) * time.Second,
 	}
 
 	// 创建客户端

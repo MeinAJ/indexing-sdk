@@ -11,43 +11,54 @@ import (
 
 // EventsClient 事件查询客户端
 type EventsClient struct {
-	baseURL     string
-	httpClient  *http.Client
-	timeout     time.Duration
-	period      time.Duration
-	debug       bool
-	dataChannel chan []*Event
+	BaseURL        string
+	HttpClient     *http.Client
+	RequestTimeout time.Duration
+	RequestPeriod  time.Duration
+	Debug          bool
+	EventSize      int
+	BlockSize      int
 }
 
 // Config 客户端配置
 type Config struct {
-	BaseURL string        // 基础URL，如 "http://127.0.0.1:8080"
-	Timeout time.Duration // 超时时间
-	Period  time.Duration // 轮询间隔
-	Debug   bool          // 调试模式
+	BaseURL        string        // 基础URL，如 "http://127.0.0.1:8080"
+	RequestTimeout time.Duration // 超时时间
+	RequestPeriod  time.Duration // 轮询间隔
+	Debug          bool          // 调试模式
+	EventSize      int           // 批量获取事件数量
+	BlockSize      int           // 批量获取事件块大小
 }
 
 // NewEventsClient 创建新的客户端实例
 func NewEventsClient(config *Config) *EventsClient {
-	if config.Timeout == 0 {
-		config.Timeout = 5 * time.Second
+	if config.RequestTimeout == 0 {
+		config.RequestTimeout = 5 * time.Second
 	}
-	if config.Period == 0 {
-		config.Period = 5 * time.Second
+	if config.RequestPeriod == 0 {
+		config.RequestPeriod = 5 * time.Second
+	}
+	if config.BlockSize == 0 {
+		config.BlockSize = 10
+	}
+	if config.EventSize == 0 {
+		config.EventSize = 100
 	}
 	return &EventsClient{
-		baseURL: config.BaseURL,
-		httpClient: &http.Client{
-			Timeout: config.Timeout,
+		BaseURL: config.BaseURL,
+		HttpClient: &http.Client{
+			Timeout: config.RequestTimeout,
 			Transport: &http.Transport{
 				MaxIdleConns:        100,
 				MaxIdleConnsPerHost: 10,
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
-		period:  config.Period,
-		timeout: config.Timeout,
-		debug:   config.Debug,
+		RequestPeriod:  config.RequestPeriod,
+		RequestTimeout: config.RequestTimeout,
+		Debug:          config.Debug,
+		EventSize:      config.EventSize,
+		BlockSize:      config.BlockSize,
 	}
 }
 
@@ -123,7 +134,7 @@ type Page struct {
 // SubscribeEvents 模拟订阅事件
 func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) error {
 	go func(req *FlowEventsRequest) {
-		timer := time.NewTimer(c.period)
+		timer := time.NewTimer(0)
 		innerReq := &HttpEventsRequest{
 			FromBlock:  req.FromBlock,
 			ToBlock:    req.FromBlock + 10,
@@ -135,44 +146,48 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 		for {
 			select {
 			case <-timer.C:
-				// 重新构造请求参数
-				response, lastErr := c.GetEvents(innerReq)
-				if lastErr != nil {
-					timer.Reset(c.period)
-					continue
-				}
-				metaData := &MetaData{
-					ScanLatestBlockNumber: req.FromBlock + 10,
-				}
-				eventData := &EventData{
-					Events:   response.Data.Data,
-					MetaData: metaData,
-				}
-				// 重置请求参数
-				if response.Data == nil || len(response.Data.Data) < 100 {
-					// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
-					metaData.ScanLatestBlockCompleted = true
-					innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, 100)
-				} else {
-					// 2、区块范围还有数据时，页数+1
-					metaData.ScanLatestBlockCompleted = false
-					innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, 100)
-				}
-				// 发送数据
-				dataChannel <- eventData
-				// 如果设置了commit channel，会等待消费者消费完成，才查询后续的数据
-				if committedChannel != nil {
-					<-committedChannel
-				}
-				timer.Reset(c.period)
+				c.CycleGetEvents(innerReq, dataChannel, committedChannel, timer)
 			}
 		}
 	}(req)
 	return nil
 }
 
+func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}, timer *time.Timer) {
+	// 重新构造请求参数
+	response, lastErr := c.GetEvents(innerReq)
+	if lastErr != nil {
+		timer.Reset(c.RequestPeriod)
+		return
+	}
+	metaData := &MetaData{
+		ScanLatestBlockNumber: innerReq.FromBlock + 10,
+	}
+	eventData := &EventData{
+		Events:   response.Data.Data,
+		MetaData: metaData,
+	}
+	// 重置请求参数
+	if response.Data == nil || len(response.Data.Data) < 100 {
+		// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
+		metaData.ScanLatestBlockCompleted = true
+		innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, 100)
+	} else {
+		// 2、区块范围还有数据时，页数+1
+		metaData.ScanLatestBlockCompleted = false
+		innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, 100)
+	}
+	// 发送数据
+	dataChannel <- eventData
+	// 如果设置了commit channel，会等待消费者消费完成，才查询后续的数据
+	if committedChannel != nil {
+		<-committedChannel
+	}
+	timer.Reset(c.RequestPeriod)
+}
+
 func (c *EventsClient) GetEvents(req *HttpEventsRequest) (*PageResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/event/list", c.baseURL)
+	url := fmt.Sprintf("%s/api/v1/event/list", c.BaseURL)
 	var lastErr error = nil
 	// 最多重试3次
 	jsonData, err := json.Marshal(req)
@@ -195,7 +210,7 @@ func (c *EventsClient) GetEvents(req *HttpEventsRequest) (*PageResponse, error) 
 		httpReq.Header.Set("Content-Type", "application/json")
 		httpReq.Header.Set("Accept", "application/json")
 		// 发送请求
-		resp, err := c.httpClient.Do(httpReq)
+		resp, err := c.HttpClient.Do(httpReq)
 		if err != nil {
 			lastErr = fmt.Errorf("http request failed: %w", err)
 			continue // 继续重试
@@ -240,7 +255,7 @@ func shouldRetry(code int) bool {
 	retryableCodes := map[int]bool{
 		429: true, // Too Many Requests
 		503: true, // Service Unavailable
-		504: true, // Gateway Timeout
+		504: true, // Gateway RequestTimeout
 	}
 	return retryableCodes[code]
 }
