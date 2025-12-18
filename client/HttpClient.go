@@ -167,14 +167,17 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 	defer timer.Reset(c.RequestPeriod)
 	latestBlockNumber, err := c.GetLatestBlockNumber()
 	if err != nil {
+		fmt.Printf("get latest block number failed: %s\n", err)
 		return
 	}
 	if innerReq.ToBlock > int(latestBlockNumber) {
+		fmt.Println("toBlock > latestBlockNumber, wait for next cycle")
 		return
 	}
 	// 重新构造请求参数
 	response, err := c.GetEvents(innerReq)
 	if err != nil {
+		fmt.Printf("get events failed: %s\n", err)
 		return
 	}
 	metaData := &MetaData{
