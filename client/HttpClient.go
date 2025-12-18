@@ -23,6 +23,7 @@ type EventsClient struct {
 type Config struct {
 	BaseURL string        // 基础URL，如 "http://127.0.0.1:8080"
 	Timeout time.Duration // 超时时间
+	Period  time.Duration // 轮询间隔
 	Debug   bool          // 调试模式
 }
 
@@ -31,7 +32,9 @@ func NewEventsClient(config *Config) *EventsClient {
 	if config.Timeout == 0 {
 		config.Timeout = 5 * time.Second
 	}
-
+	if config.Period == 0 {
+		config.Period = 5 * time.Second
+	}
 	return &EventsClient{
 		baseURL: config.BaseURL,
 		httpClient: &http.Client{
@@ -42,6 +45,7 @@ func NewEventsClient(config *Config) *EventsClient {
 				IdleConnTimeout:     90 * time.Second,
 			},
 		},
+		period:  config.Period,
 		timeout: config.Timeout,
 		debug:   config.Debug,
 	}
