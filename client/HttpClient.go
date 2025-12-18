@@ -121,7 +121,7 @@ type Page struct {
 }
 
 // SubscribeEvents 模拟订阅事件
-func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData) error {
+func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) error {
 	go func(req *FlowEventsRequest) {
 		timer := time.NewTimer(c.period)
 		innerReq := &HttpEventsRequest{
@@ -160,6 +160,8 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 				}
 				// 发送数据
 				dataChannel <- eventData
+				// 等待消费者消费完成，才查询后续的数据
+				<-committedChannel
 				timer.Reset(c.period)
 			}
 		}

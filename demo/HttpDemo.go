@@ -24,8 +24,9 @@ func TestHttp() {
 	}
 
 	var dataChannel = make(chan *client.EventData)
+	var committedChannel = make(chan interface{})
 
-	err := eventsClient.SubscribeEvents(req, dataChannel)
+	err := eventsClient.SubscribeEvents(req, dataChannel, committedChannel)
 	if err != nil {
 		fmt.Println(err)
 		return
