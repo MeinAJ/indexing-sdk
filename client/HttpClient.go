@@ -123,41 +123,58 @@ type PageResponse struct {
 	Data    *Page  `json:"data"`
 }
 
+type Response struct {
+	Code    int                `json:"code"`
+	Message string             `json:"message"`
+	Data    *LatestBlockNumber `json:"data"`
+}
+
+type LatestBlockNumber struct {
+	LatestBlockNumber uint64 `json:"latestBlockNumber"` // 最新区块号
+}
+
 type Page struct {
-	Page              int      `json:"page"`                // 页码
-	Size              int      `json:"size"`                // 每页大小
-	Total             int      `json:"total"`               // 总数
-	Data              []*Event `json:"data"`                // 数据
-	LatestBlockNumber int64    `json:"latest_block_number"` // 最新区块号
+	Page  int      `json:"page"`  // 页码
+	Size  int      `json:"size"`  // 每页大小
+	Total int      `json:"total"` // 总数
+	Data  []*Event `json:"data"`  // 数据
 }
 
 // SubscribeEvents 模拟订阅事件
 func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) error {
-	go func(req *FlowEventsRequest) {
+	innerReq := &HttpEventsRequest{
+		FromBlock:  req.FromBlock,
+		ToBlock:    req.FromBlock + c.BlockSize,
+		Address:    req.Address,
+		EventNames: req.EventNames,
+		PageNumber: 1,
+		PageSize:   c.EventSize,
+	}
+	go func(innerReq *HttpEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) {
 		timer := time.NewTimer(0)
-		innerReq := &HttpEventsRequest{
-			FromBlock:  req.FromBlock,
-			ToBlock:    req.FromBlock + c.BlockSize,
-			Address:    req.Address,
-			EventNames: req.EventNames,
-			PageNumber: 1,
-			PageSize:   c.EventSize,
-		}
+		defer timer.Stop()
 		for {
 			select {
 			case <-timer.C:
 				c.CycleGetEvents(innerReq, dataChannel, committedChannel, timer)
 			}
 		}
-	}(req)
+	}(innerReq, dataChannel, committedChannel)
 	return nil
 }
 
 func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}, timer *time.Timer) {
+	defer timer.Reset(c.RequestPeriod)
+	latestBlockNumber, err := c.GetLatestBlockNumber()
+	if err != nil {
+		return
+	}
+	if innerReq.ToBlock > int(latestBlockNumber) {
+		return
+	}
 	// 重新构造请求参数
-	response, lastErr := c.GetEvents(innerReq)
-	if lastErr != nil {
-		timer.Reset(c.RequestPeriod)
+	response, err := c.GetEvents(innerReq)
+	if err != nil {
 		return
 	}
 	metaData := &MetaData{
@@ -186,7 +203,61 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 	if committedChannel != nil {
 		<-committedChannel
 	}
-	timer.Reset(c.RequestPeriod)
+}
+
+func (c *EventsClient) GetLatestBlockNumber() (uint64, error) {
+	url := fmt.Sprintf("%s/api/v1/event/latestBlockNumber", c.BaseURL)
+	var lastErr error = nil
+	// 最多重试3次
+	for attempt := 0; attempt < 3; attempt++ {
+		// 如果不是第一次尝试，等待一段时间（指数退避）
+		if attempt > 0 {
+			// 指数退避：第一次重试等1秒，第二次等2秒
+			waitTime := time.Duration(attempt) * time.Second
+			time.Sleep(waitTime)
+		}
+		// 创建HTTP请求
+		httpReq, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			lastErr = fmt.Errorf("create http request failed: %w", err)
+			continue // 继续重试
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("Accept", "application/json")
+		// 发送请求
+		resp, err := c.HttpClient.Do(httpReq)
+		if err != nil {
+			lastErr = fmt.Errorf("http request failed: %w", err)
+			continue // 继续重试
+		}
+		// 读取响应
+		body, err := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if err != nil {
+			lastErr = fmt.Errorf("read response body failed: %w", err)
+			continue // 继续重试
+		}
+		// 解析响应
+		var apiResult Response
+		if err := json.Unmarshal(body, &apiResult); err != nil {
+			lastErr = fmt.Errorf("unmarshal response body failed: %w", err)
+			continue // 继续重试
+		}
+		// 检查API业务错误码
+		if apiResult.Code != 200 && apiResult.Code != 0 {
+			// 如果是业务逻辑错误，通常不需要重试（除非某些特定错误码需要重试）
+			// 这里可以根据具体业务需求调整，比如某些特定错误码也需要重试
+			lastErr = fmt.Errorf("error getting events: %s", apiResult.Message)
+			// 如果是网络错误或服务器错误，继续重试；如果是业务错误，直接返回
+			if !shouldRetry(apiResult.Code) {
+				return 0, lastErr
+			}
+			continue
+		}
+		// 成功，返回结果
+		return apiResult.Data.LatestBlockNumber, nil
+	}
+	return 0, lastErr
 }
 
 func (c *EventsClient) GetEvents(req *HttpEventsRequest) (*PageResponse, error) {
