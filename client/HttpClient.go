@@ -137,11 +137,11 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 		timer := time.NewTimer(0)
 		innerReq := &HttpEventsRequest{
 			FromBlock:  req.FromBlock,
-			ToBlock:    req.FromBlock + 10,
+			ToBlock:    req.FromBlock + c.BlockSize,
 			Address:    req.Address,
 			EventNames: req.EventNames,
 			PageNumber: 1,
-			PageSize:   100,
+			PageSize:   c.EventSize,
 		}
 		for {
 			select {
@@ -161,21 +161,24 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		return
 	}
 	metaData := &MetaData{
-		ScanLatestBlockNumber: innerReq.FromBlock + 10,
+		ScanLatestBlockNumber: innerReq.FromBlock + c.BlockSize,
 	}
 	eventData := &EventData{
 		Events:   response.Data.Data,
 		MetaData: metaData,
 	}
 	// 重置请求参数
-	if response.Data == nil || len(response.Data.Data) < 100 {
+	total := response.Data.Total
+	size := response.Data.Size
+	page := response.Data.Page
+	if response.Data == nil || len(response.Data.Data) < c.EventSize || (page*size == total) {
 		// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
 		metaData.ScanLatestBlockCompleted = true
-		innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, 100)
+		innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, c.EventSize)
 	} else {
 		// 2、区块范围还有数据时，页数+1
 		metaData.ScanLatestBlockCompleted = false
-		innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, 100)
+		innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, c.EventSize)
 	}
 	// 发送数据
 	dataChannel <- eventData
