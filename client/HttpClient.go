@@ -156,6 +156,7 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 		for {
 			select {
 			case <-timer.C:
+				timer.Stop()
 				c.CycleGetEvents(innerReq, dataChannel, committedChannel, timer)
 			}
 		}
@@ -171,7 +172,7 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		return
 	}
 	if innerReq.ToBlock > int(latestBlockNumber) {
-		fmt.Printf("toBlock(%d) > latestBlockNumber(%d), wait for next cycle", innerReq.ToBlock, latestBlockNumber)
+		fmt.Printf("toBlock(%d) > latestBlockNumber(%d), wait for next cycle\n", innerReq.ToBlock, latestBlockNumber)
 		return
 	}
 	// 重新构造请求参数
