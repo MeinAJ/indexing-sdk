@@ -182,7 +182,7 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		return
 	}
 	metaData := &MetaData{
-		ScanLatestBlockNumber: innerReq.FromBlock + c.BlockSize,
+		ScanLatestBlockNumber: innerReq.ToBlock,
 	}
 	eventData := &EventData{
 		Events:   response.Data.Data,
@@ -195,7 +195,7 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 	if response.Data == nil || len(response.Data.Data) < c.EventSize || (page*size == total) {
 		// 1、没有数据或者条数不满足100条，表示这个区块范围，已经查询完了；重置区块号
 		metaData.ScanLatestBlockCompleted = true
-		innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+11, 1, c.EventSize)
+		innerReq.Reset(innerReq.ToBlock+1, innerReq.ToBlock+1+c.BlockSize, 1, c.EventSize)
 	} else {
 		// 2、区块范围还有数据时，页数+1
 		metaData.ScanLatestBlockCompleted = false
