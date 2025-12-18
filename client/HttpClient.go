@@ -160,8 +160,10 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 				}
 				// 发送数据
 				dataChannel <- eventData
-				// 等待消费者消费完成，才查询后续的数据
-				<-committedChannel
+				// 如果设置了commit channel，会等待消费者消费完成，才查询后续的数据
+				if committedChannel != nil {
+					<-committedChannel
+				}
 				timer.Reset(c.period)
 			}
 		}
