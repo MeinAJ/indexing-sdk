@@ -171,7 +171,7 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		return
 	}
 	if innerReq.ToBlock > int(latestBlockNumber) {
-		fmt.Println("toBlock > latestBlockNumber, wait for next cycle")
+		fmt.Printf("toBlock(%d) > latestBlockNumber(%d), wait for next cycle", innerReq.ToBlock, latestBlockNumber)
 		return
 	}
 	// 重新构造请求参数
