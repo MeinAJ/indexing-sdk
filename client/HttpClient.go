@@ -87,7 +87,7 @@ func (request *HttpEventsRequest) Reset(fromBlock int, toBlock int, pageNumber i
 
 type MetaData struct {
 	ScanLatestBlockNumber    int  `json:"scanLatestBlockNumber"`    // 最后扫描区块号
-	ScanLatestBlockCompleted bool `json:"ScanLatestBlockCompleted"` // 最后扫描区块是否扫描完成
+	ScanLatestBlockCompleted bool `json:"scanLatestBlockCompleted"` // 最后扫描区块是否扫描完成
 }
 
 type EventData struct {
@@ -184,10 +184,6 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 	metaData := MetaData{
 		ScanLatestBlockNumber: innerReq.ToBlock,
 	}
-	eventData := EventData{
-		Events:   response.Data.Data,
-		MetaData: metaData,
-	}
 	// 重置请求参数
 	total := response.Data.Total
 	size := response.Data.Size
@@ -200,6 +196,10 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		// 2、区块范围还有数据时，页数+1
 		metaData.ScanLatestBlockCompleted = false
 		innerReq.Reset(innerReq.FromBlock, innerReq.ToBlock, innerReq.PageNumber+1, c.EventSize)
+	}
+	eventData := EventData{
+		Events:   response.Data.Data,
+		MetaData: metaData,
 	}
 	// 发送数据
 	dataChannel <- eventData
