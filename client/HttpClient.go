@@ -91,8 +91,8 @@ type MetaData struct {
 }
 
 type EventData struct {
-	MetaData *MetaData `json:"metaData"`
-	Events   []*Event  `json:"events"`
+	MetaData MetaData `json:"metaData"`
+	Events   []Event  `json:"events"`
 }
 
 // Event 事件数据结构
@@ -134,14 +134,14 @@ type LatestBlockNumber struct {
 }
 
 type Page struct {
-	Page  int      `json:"page"`  // 页码
-	Size  int      `json:"size"`  // 每页大小
-	Total int      `json:"total"` // 总数
-	Data  []*Event `json:"data"`  // 数据
+	Page  int     `json:"page"`  // 页码
+	Size  int     `json:"size"`  // 每页大小
+	Total int     `json:"total"` // 总数
+	Data  []Event `json:"data"`  // 数据
 }
 
 // SubscribeEvents 模拟订阅事件
-func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) error {
+func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan EventData, committedChannel chan interface{}) error {
 	innerReq := &HttpEventsRequest{
 		FromBlock:  req.FromBlock,
 		ToBlock:    req.FromBlock + c.BlockSize,
@@ -150,7 +150,7 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 		PageNumber: 1,
 		PageSize:   c.EventSize,
 	}
-	go func(innerReq *HttpEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}) {
+	go func(innerReq *HttpEventsRequest, dataChannel chan EventData, committedChannel chan interface{}) {
 		timer := time.NewTimer(0)
 		defer timer.Stop()
 		for {
@@ -164,7 +164,7 @@ func (c *EventsClient) SubscribeEvents(req *FlowEventsRequest, dataChannel chan 
 	return nil
 }
 
-func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel chan *EventData, committedChannel chan interface{}, timer *time.Timer) {
+func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel chan EventData, committedChannel chan interface{}, timer *time.Timer) {
 	defer timer.Reset(c.RequestPeriod)
 	latestBlockNumber, err := c.GetLatestBlockNumber()
 	if err != nil {
@@ -181,10 +181,10 @@ func (c *EventsClient) CycleGetEvents(innerReq *HttpEventsRequest, dataChannel c
 		fmt.Printf("get events failed: %s\n", err)
 		return
 	}
-	metaData := &MetaData{
+	metaData := MetaData{
 		ScanLatestBlockNumber: innerReq.ToBlock,
 	}
-	eventData := &EventData{
+	eventData := EventData{
 		Events:   response.Data.Data,
 		MetaData: metaData,
 	}

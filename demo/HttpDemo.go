@@ -23,7 +23,7 @@ func TestHttp() {
 		EventNames: []string{"Transfer"},
 	}
 
-	var dataChannel = make(chan *client.EventData)
+	var dataChannel = make(chan client.EventData)
 	var committedChannel = make(chan interface{})
 
 	err := eventsClient.SubscribeEvents(req, dataChannel, committedChannel)
